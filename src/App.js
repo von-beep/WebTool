@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -27,7 +27,8 @@ import {
   UserCheck,
   Trash2,
   History,
-  Activity
+  Activity,
+  DownloadCloud
 } from 'lucide-react';
 import { 
   auth, 
@@ -53,16 +54,48 @@ import HolidayCalendarView from './components/HolidayCalendarView';
 // --- CORE APP COMPONENT ---
 
 const App = () => {
-  const [view, setView] = useState('landing');
-  const [subView, setSubView] = useState('main');
-  const [user, setUser] = useState(null);
+  const todayString = new Date().toISOString().split('T')[0];
+  const [view, setView] = useState(() => {
+    const storedView = localStorage.getItem('nexusPortalView');
+    const hasUser = Boolean(localStorage.getItem('nexusPortalUser'));
+    if (storedView) {
+      if (storedView === 'dashboard' && !hasUser) return 'landing';
+      return storedView;
+    }
+    return hasUser ? 'dashboard' : 'landing';
+  });
+  const [subView, setSubView] = useState(() => localStorage.getItem('nexusPortalSubView') || 'main');
+  const [selectedDate, setSelectedDate] = useState(() => localStorage.getItem('nexusPortalSelectedDate') || todayString);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('nexusPortalUser');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [fuser, setFUser] = useState(null); 
+  const dateInputRef = useRef(null);
+
+  const openDatePicker = () => {
+    if (!dateInputRef.current) return;
+    if (typeof dateInputRef.current.showPicker === 'function') {
+      dateInputRef.current.showPicker();
+    } else {
+      dateInputRef.current.click();
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [appData, setAppData] = useState({ users: [], pendingUsers: [], logs: [], holidayRequests: [] });
   const [formData, setFormData] = useState({ email: '', password: '', accessCode: '', fullName: '' });
+
+  const persistUser = (user) => localStorage.setItem('nexusPortalUser', JSON.stringify(user));
+  const clearPersistedUser = () => localStorage.removeItem('nexusPortalUser');
+  const persistView = (page) => localStorage.setItem('nexusPortalView', page);
+  const persistSubView = (page) => localStorage.setItem('nexusPortalSubView', page);
+  const persistSelectedDate = (date) => localStorage.setItem('nexusPortalSelectedDate', date);
+  const clearPersistedView = () => localStorage.removeItem('nexusPortalView');
+  const clearPersistedSubView = () => localStorage.removeItem('nexusPortalSubView');
+  const clearPersistedDate = () => localStorage.removeItem('nexusPortalSelectedDate');
 
   useEffect(() => {
     const initAuth = async () => {
@@ -81,8 +114,19 @@ const App = () => {
 
   useEffect(() => {
     if (!fuser) return;
-    // Load data from API instead of Firebase listener
-    loadAppData();
+    // Set up real-time data listener instead of one-time load
+    const unsubscribe = onSnapshot(doc(db, appId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAppData({
+          users: data.users || [],
+          pendingUsers: data.pendingUsers || [],
+          logs: data.logs || [],
+          holidayRequests: data.holidayRequests || []
+        });
+      }
+    });
+    return () => unsubscribe();
   }, [fuser]);
 
   const isTimedIn = useMemo(() => {
@@ -107,7 +151,62 @@ const App = () => {
    */
   const navigateTo = (newView) => {
     resetInterface();
+    persistView(newView);
     setView(newView);
+  };
+
+  const switchSubView = (newSubView) => {
+    persistSubView(newSubView);
+    setSubView(newSubView);
+  };
+
+  const getLogDateString = (timestamp) => {
+    const parsed = new Date(timestamp);
+    if (isNaN(parsed)) return null;
+    return parsed.toISOString().split('T')[0];
+  };
+
+  const formatDateLabel = (dateString) => {
+    const parsed = new Date(dateString);
+    if (isNaN(parsed)) return dateString;
+    return parsed.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatDisplayDate = (dateString) => {
+    const parsed = new Date(dateString);
+    if (isNaN(parsed)) return dateString;
+    const month = parsed.toLocaleString('en-PH', { month: 'long' });
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+
+  const updateSelectedDate = (newDate) => {
+    persistSelectedDate(newDate);
+    setSelectedDate(newDate);
+  };
+
+  const resetSelectedDate = () => {
+    updateSelectedDate(todayString);
+  };
+
+  const downloadTimeLogReport = () => {
+    const filteredLogs = appData.logs.filter(log => getLogDateString(log.timestamp) === selectedDate);
+    const headers = ['User Name', 'User Email', 'Type', 'Timestamp'];
+    const rows = filteredLogs.map(log => [log.userName, log.userEmail, log.type, log.timestamp]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(value => `"${String(value || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TimeLogReport_${selectedDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const loadAppData = async () => {
@@ -160,6 +259,9 @@ const App = () => {
     try {
       const result = await loginUser(formData.email.toLowerCase().trim(), formData.password);
       if (result.success) {
+        persistUser(result.user);
+        persistView('dashboard');
+        persistSubView('main');
         setUser(result.user);
         resetInterface();
         setView('dashboard');
@@ -296,7 +398,7 @@ const App = () => {
           <ShieldCheck className="text-indigo-600" size={32} />
           <span>Nexus <span className="text-indigo-600">Portal</span></span>
         </div>
-        <button onClick={() => { setUser(null); navigateTo('landing'); }} className="p-3.5 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-2xl transition-all"><LogOut size={22} /></button>
+        <button onClick={() => { clearPersistedUser(); clearPersistedView(); clearPersistedSubView(); clearPersistedDate(); setUser(null); navigateTo('login'); }} className="p-3.5 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-2xl transition-all"><LogOut size={22} /></button>
       </nav>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-12">
@@ -336,7 +438,7 @@ const App = () => {
                       {/* Work Request Panel */}
                       <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
                         <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
-                          <h3 className="font-black text-[10px] tracking-[0.3em] text-slate-400 uppercase">Clearance Requests</h3>
+                          <h3 className="font-black text-[10px] tracking-[0.3em] text-slate-400 uppercase">Work on Holiday Request</h3>
                         </div>
                         <div className="flex-1 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
                           {(appData.holidayRequests || []).filter(r => r.status === 'pending').length === 0 ? (
@@ -394,19 +496,52 @@ const App = () => {
 
                   {/* Right Column: Attendance Logs (4 cols) */}
                   <div className="lg:col-span-4 bg-slate-900 rounded-[3rem] shadow-2xl flex flex-col h-[500px] overflow-hidden">
-                    <div className="p-8 border-b border-slate-800 flex justify-between items-center">
-                      <h3 className="font-black text-[10px] tracking-[0.3em] text-slate-500 uppercase flex items-center gap-2">
-                        <History size={14} className="text-indigo-400" /> System Activity
-                      </h3>
-                      <Activity className="text-emerald-500 animate-pulse" size={16} />
+                    <div className="p-8 border-b border-slate-800">
+                      <div className="flex justify-between items-center gap-4">
+                        <h3 className="font-black text-[10px] tracking-[0.3em] text-slate-500 uppercase flex items-center gap-2">
+                          <History size={14} className="text-indigo-400" /> Daily Time Log
+                        </h3>
+                        <Activity className="text-emerald-500 animate-pulse" size={16} />
+                      </div>
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="relative w-full sm:w-auto">
+                          <label className="sr-only" htmlFor="daily-log-date">Select date</label>
+                          <input
+                            ref={dateInputRef}
+                            id="daily-log-date"
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => updateSelectedDate(e.target.value)}
+                            max={todayString}
+                            className="sr-only"
+                          />
+                          <div
+                            onClick={openDatePicker}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDatePicker(); } }}
+                            role="button"
+                            tabIndex={0}
+                            className="px-4 py-3 bg-slate-800 text-slate-200 rounded-2xl border border-slate-700 hover:border-indigo-500 transition-all min-w-[220px] cursor-pointer"
+                          >
+                            {formatDisplayDate(selectedDate)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={downloadTimeLogReport}
+                          className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-500 transition-all"
+                          aria-label="Download Report"
+                        >
+                          <DownloadCloud size={20} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                      {appData.logs.length === 0 ? (
+                      {appData.logs.filter(log => getLogDateString(log.timestamp) === selectedDate).length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-slate-700">
-                          <p className="text-[9px] font-black uppercase tracking-widest">No logs found</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest">No logs found for this date</p>
                         </div>
                       ) : (
-                        [...appData.logs].reverse().slice(0, 50).map((log, i) => (
+                        [...appData.logs].filter(log => getLogDateString(log.timestamp) === selectedDate).reverse().map((log, i) => (
                           <div key={i} className="p-5 bg-slate-800/50 rounded-2xl border border-slate-800 flex items-center justify-between group transition-all hover:bg-slate-800">
                             <div>
                               <div className="flex items-center gap-2 mb-1">
@@ -441,7 +576,7 @@ const App = () => {
                   <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center mb-6 shadow-xl"><CalendarIcon className="text-white" size={24} /></div>
                   <h3 className="text-xl font-black text-slate-900 mb-2">Calendar</h3>
                   <div className="mt-auto">
-                    <button onClick={() => setSubView('calendar')} className="flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all">
+                    <button onClick={() => switchSubView('calendar')} className="flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all">
                       View Holidays <ArrowRight size={16} />
                     </button>
                   </div>

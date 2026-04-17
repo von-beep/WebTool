@@ -1,6 +1,92 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "0c6ba561-5e4e-42fa-8b74-a5c9696f7890",
+      "email": "admin@test.com",
+      "password": "123456",
+      "fullName": "Administrator",
+      "role": "admin"
+    },
+    {
+      "id": "b0e4cd69-4252-4f81-9184-0a4a7faab755",
+      "email": "juan@test.com",
+      "password": "123456",
+      "fullName": "Juan dela Cruz",
+      "role": "user"
+    },
+    {
+      "id": "975014f8-2aa7-4ce3-8ca6-9770175b6369",
+      "email": "acer@test.com",
+      "password": "123456",
+      "fullName": "Acer",
+      "role": "user"
+    }
+  ],
   "pendingUsers": [],
-  "logs": [],
-  "holidayRequests": []
+  "logs": [
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time In",
+      "timestamp": "4/16/2026, 10:35:43 AM"
+    },
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time Out",
+      "timestamp": "4/16/2026, 10:35:56 AM"
+    },
+    {
+      "userEmail": "acer@test.com",
+      "userName": "Acer",
+      "type": "Time In",
+      "timestamp": "4/16/2026, 11:59:28 AM"
+    },
+    {
+      "userEmail": "acer@test.com",
+      "userName": "Acer",
+      "type": "Time Out",
+      "timestamp": "4/16/2026, 12:10:17 PM"
+    },
+    {
+      "userEmail": "acer@test.com",
+      "userName": "Acer",
+      "type": "Time In",
+      "timestamp": "4/16/2026, 12:34:38 PM"
+    },
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time In",
+      "timestamp": "4/17/2026, 8:54:08 AM"
+    },
+    {
+      "userEmail": "acer@test.com",
+      "userName": "Acer",
+      "type": "Time Out",
+      "timestamp": "4/17/2026, 9:07:11 AM"
+    }
+  ],
+  "holidayRequests": [
+    {
+      "id": "ac1aad2d-623f-40de-919b-0ee10c3d082e",
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "holidayName": "Araw ng Paggawa",
+      "holidayDate": "2026-05-01",
+      "details": "Work",
+      "status": "denied",
+      "timestamp": "4/16/2026, 10:36:06 AM"
+    },
+    {
+      "id": "1642d9fd-4f13-4178-8f47-737bb2c97c79",
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "holidayName": "Araw ng Kalayaan",
+      "holidayDate": "2026-06-12",
+      "details": "Test",
+      "status": "approved",
+      "timestamp": "4/17/2026, 9:06:10 AM"
+    }
+  ]
 }

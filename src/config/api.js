@@ -1,5 +1,5 @@
 // API functions for MySQL backend
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
@@ -125,8 +125,8 @@ export const onSnapshot = (docRef, callback) => {
   };
 
   fetchData();
-  // Set up polling for real-time updates (every 5 seconds)
-  const interval = setInterval(fetchData, 5000);
+  // Set up polling for real-time updates (every 2 seconds)
+  const interval = setInterval(fetchData, 2000);
 
   return () => clearInterval(interval);
 };
