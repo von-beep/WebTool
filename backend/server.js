@@ -76,6 +76,21 @@ async function initDatabase() {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS leave_applications (
+        id VARCHAR(36) PRIMARY KEY,
+        userEmail VARCHAR(255) NOT NULL,
+        userName VARCHAR(255) NOT NULL,
+        leaveType VARCHAR(255) NOT NULL,
+        startDate DATE NOT NULL,
+        endDate DATE NOT NULL,
+        details TEXT,
+        status ENUM('pending', 'approved', 'denied') DEFAULT 'pending',
+        timestamp VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Database initialization failed:', error);
@@ -91,12 +106,14 @@ app.get('/api/data', async (req, res) => {
     const [pendingUsers] = await db.execute('SELECT * FROM pending_users ORDER BY created_at DESC');
     const [logs] = await db.execute('SELECT * FROM logs ORDER BY created_at DESC');
     const [holidayRequests] = await db.execute('SELECT * FROM holiday_requests ORDER BY created_at DESC');
+    const [leaveApplications] = await db.execute('SELECT * FROM leave_applications ORDER BY created_at DESC');
 
     res.json({
       users,
       pendingUsers,
       logs,
-      holidayRequests
+      holidayRequests,
+      leaveApplications
     });
   } catch (error) {
     console.error(error);
@@ -214,6 +231,36 @@ app.put('/api/holiday-requests/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update holiday request' });
+  }
+});
+
+// Add leave application
+app.post('/api/leave-applications', async (req, res) => {
+  try {
+    const { id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp } = req.body;
+    await db.execute(
+      'INSERT INTO leave_applications (id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to add leave application' });
+  }
+});
+
+// Update leave application status
+app.put('/api/leave-applications/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    await db.execute(
+      'UPDATE leave_applications SET status = ? WHERE id = ?',
+      [status, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update leave application' });
   }
 });
 

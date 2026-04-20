@@ -83,6 +83,12 @@
       "userName": "Juan dela Cruz",
       "type": "Time In",
       "timestamp": "4/20/2026, 11:57:39 AM"
+    },
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time Out",
+      "timestamp": "4/20/2026, 12:24:21 PM"
     }
   ],
   "holidayRequests": [
