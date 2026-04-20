@@ -27,6 +27,7 @@ import {
   UserCheck,
   Trash2,
   History,
+  FileText,
   Activity,
   DownloadCloud
 } from 'lucide-react';
@@ -46,7 +47,8 @@ import {
   loginUser,
   addUser,
   addPendingUser,
-  getAllData
+  getAllData,
+  updateDoc as apiUpdateDoc
 } from './config/api';
 import { CONFIG } from './config/constants';
 import HolidayCalendarView from './components/HolidayCalendarView';
@@ -85,7 +87,7 @@ const App = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [appData, setAppData] = useState({ users: [], pendingUsers: [], logs: [], holidayRequests: [] });
+  const [appData, setAppData] = useState({ users: [], pendingUsers: [], logs: [], holidayRequests: [], leaveApplications: [] });
   const [formData, setFormData] = useState({ email: '', password: '', accessCode: '', fullName: '' });
 
   const persistUser = (user) => localStorage.setItem('nexusPortalUser', JSON.stringify(user));
@@ -122,7 +124,8 @@ const App = () => {
           users: data.users || [],
           pendingUsers: data.pendingUsers || [],
           logs: data.logs || [],
-          holidayRequests: data.holidayRequests || []
+          holidayRequests: data.holidayRequests || [],
+          leaveApplications: data.leaveApplications || []
         });
       }
     });
@@ -216,7 +219,8 @@ const App = () => {
         users: data.users || [],
         pendingUsers: data.pendingUsers || [],
         logs: data.logs || [],
-        holidayRequests: data.holidayRequests || []
+        holidayRequests: data.holidayRequests || [],
+        leaveApplications: data.leaveApplications || []
       });
     } catch (error) {
       console.error('Failed to load app data:', error);
@@ -338,6 +342,28 @@ const App = () => {
     }
   };
 
+  const approveLeaveApplication = async (req) => {
+    try {
+      await apiUpdateDoc(null, { leaveApplications: { __type: 'update', id: req.id, status: 'approved' } });
+      await loadAppData();
+    } catch (error) {
+      console.error('Failed to approve leave application:', error);
+    }
+  };
+
+  const denyLeaveApplication = async (req) => {
+    try {
+      await apiUpdateDoc(null, { leaveApplications: { __type: 'update', id: req.id, status: 'denied' } });
+      await loadAppData();
+    } catch (error) {
+      console.error('Failed to deny leave application:', error);
+    }
+  };
+
+  const switchViewAndReset = (view) => {
+    resetInterface();
+    switchSubView(view);
+  };
   if (view === 'landing') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
       <div className="max-w-4xl w-full animate-in fade-in zoom-in-95 duration-1000">
@@ -402,7 +428,7 @@ const App = () => {
       </nav>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-12">
-        {subView === 'calendar' ? <HolidayCalendarView setSubView={setSubView} currentUser={user} appData={appData} refreshData={loadAppData} /> : (
+        {subView === 'calendar' ? <HolidayCalendarView setSubView={switchViewAndReset} currentUser={user} appData={appData} refreshData={loadAppData} /> : subView === 'leave-application' ? <LeaveApplicationView setSubView={switchViewAndReset} currentUser={user} refreshData={loadAppData} /> : (
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
             {user?.role === 'admin' ? (
               <div className="space-y-10">
@@ -419,7 +445,7 @@ const App = () => {
                       <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center"><Briefcase size={24}/></div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clearance Pending</p>
-                        <p className="text-3xl font-black text-slate-900">{(appData.holidayRequests || []).filter(r => r.status === 'pending').length}</p>
+                        <p className="text-3xl font-black text-slate-900">{(appData.holidayRequests || []).filter(r => r.status === 'pending').length + (appData.leaveApplications || []).filter(r => r.status === 'pending').length}</p>
                       </div>
                    </div>
                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6">
@@ -433,7 +459,7 @@ const App = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                   {/* Left Column: Approvals (8 cols) */}
-                  <div className="lg:col-span-8 space-y-10">
+                  <div className="lg:col-span-8 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {/* Work Request Panel */}
                       <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
@@ -456,6 +482,35 @@ const App = () => {
                                 <div className="flex gap-1.5">
                                   <button onClick={() => denyHolidayRequest(r)} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"><X size={16}/></button>
                                   <button onClick={() => approveHolidayRequest(r)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Check size={16}/></button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 line-clamp-2 italic">"{r.details}"</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Leave Application Panel */}
+                      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
+                        <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
+                          <h3 className="font-black text-[10px] tracking-[0.3em] text-slate-400 uppercase">Leave Applications</h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
+                          {(appData.leaveApplications || []).filter(r => r.status === 'pending').length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                              <CheckCircle2 size={32} className="mb-4 opacity-20" />
+                              <p className="text-[9px] font-black uppercase tracking-widest">All Clear</p>
+                            </div>
+                          ) : (appData.leaveApplications || []).filter(r => r.status === 'pending').map(r => (
+                            <div key={r.id} className="p-6 hover:bg-slate-50 transition-colors">
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <p className="font-black text-slate-900 text-sm">{r.userName}</p>
+                                  <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">{r.leaveType} ({new Date(r.startDate).toLocaleDateString()} - {new Date(r.endDate).toLocaleDateString()})</p>
+                                </div>
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => denyLeaveApplication(r)} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"><X size={16}/></button>
+                                  <button onClick={() => approveLeaveApplication(r)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Check size={16}/></button>
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 line-clamp-2 italic">"{r.details}"</p>
@@ -561,7 +616,7 @@ const App = () => {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in">
                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col hover:shadow-2xl transition-all relative overflow-hidden group">
                   <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mb-6 shadow-xl"><Timer className="text-white" size={24} /></div>
                   <h3 className="text-xl font-black text-slate-900 mb-2">Attendance</h3>
@@ -576,8 +631,17 @@ const App = () => {
                   <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center mb-6 shadow-xl"><CalendarIcon className="text-white" size={24} /></div>
                   <h3 className="text-xl font-black text-slate-900 mb-2">Calendar</h3>
                   <div className="mt-auto">
-                    <button onClick={() => switchSubView('calendar')} className="flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all">
+                    <button onClick={() => switchViewAndReset('calendar')} className="flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all">
                       View Holidays <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col hover:shadow-2xl transition-all relative overflow-hidden group">
+                  <div className="w-14 h-14 rounded-2xl bg-teal-500 flex items-center justify-center mb-6 shadow-xl"><FileText className="text-white" size={24} /></div>
+                  <h3 className="text-xl font-black text-slate-900 mb-2">Leave Request</h3>
+                  <div className="mt-auto">
+                    <button onClick={() => switchViewAndReset('leave-application')} className="flex items-center justify-between w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 transition-all">
+                      File a Leave <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>
@@ -607,6 +671,83 @@ const App = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const LeaveApplicationView = ({ setSubView, currentUser, refreshData }) => {
+  const [formData, setFormData] = useState({ leaveType: 'Vacation', startDate: '', endDate: '', details: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true); setError(''); setSuccess('');
+
+    if (!formData.startDate || !formData.endDate || !formData.details) {
+      setError('Please fill out all fields.');
+      setLoading(false);
+      return;
+    }
+
+    if (new Date(formData.startDate) > new Date(formData.endDate)) {
+      setError('Start date cannot be after end date.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const newApplication = {
+        id: crypto.randomUUID(),
+        userEmail: currentUser.email,
+        userName: currentUser.fullName,
+        leaveType: formData.leaveType,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        details: formData.details,
+        status: 'pending',
+        timestamp: new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+      };
+      await apiUpdateDoc(null, { leaveApplications: newApplication });
+      setSuccess('Leave application submitted successfully.');
+      await refreshData();
+      setTimeout(() => setSubView('main'), 2000);
+    } catch (err) {
+      setError('Failed to submit application. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="flex items-center gap-4 mb-10">
+        <button onClick={() => setSubView('main')} className="p-3.5 bg-white text-slate-500 hover:text-slate-900 rounded-2xl transition-all border border-slate-200"><ArrowLeft size={22} /></button>
+        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">File a Leave Application</h2>
+      </div>
+
+      <div className="max-w-2xl mx-auto bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm">
+        {error && <div className="mb-8 p-5 bg-rose-50 text-rose-600 rounded-3xl text-xs font-black">{error}</div>}
+        {success && <div className="mb-8 p-5 bg-emerald-50 text-emerald-600 rounded-3xl text-xs font-black">{success}</div>}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <select name="leaveType" value={formData.leaveType} onChange={handleInputChange} className="w-full px-8 py-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none appearance-none">
+            <option>Vacation</option><option>Sick Leave</option><option>Emergency</option><option>Other</option>
+          </select>
+          <div className="grid grid-cols-2 gap-4">
+            <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full px-8 py-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none" required />
+            <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full px-8 py-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none" required />
+          </div>
+          <textarea name="details" value={formData.details} onChange={handleInputChange} placeholder="Reason for leave..." rows="4" className="w-full px-8 py-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none" required></textarea>
+          <button disabled={loading} className="w-full py-6 bg-slate-900 text-white font-black text-xs uppercase tracking-[0.3em] rounded-3xl shadow-xl hover:bg-teal-600 transition-all disabled:opacity-50">
+            {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Submit Application'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

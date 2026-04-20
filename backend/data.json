@@ -65,6 +65,24 @@
       "userName": "Acer",
       "type": "Time Out",
       "timestamp": "4/17/2026, 9:07:11 AM"
+    },
+    {
+      "userEmail": "acer@test.com",
+      "userName": "Acer",
+      "type": "Time In",
+      "timestamp": "4/17/2026, 10:57:59 AM"
+    },
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time Out",
+      "timestamp": "4/20/2026, 11:53:10 AM"
+    },
+    {
+      "userEmail": "juan@test.com",
+      "userName": "Juan dela Cruz",
+      "type": "Time In",
+      "timestamp": "4/20/2026, 11:57:39 AM"
     }
   ],
   "holidayRequests": [

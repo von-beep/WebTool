@@ -21,7 +21,8 @@ async function initDataFile() {
       users: [],
       pendingUsers: [],
       logs: [],
-      holidayRequests: []
+      holidayRequests: [],
+      leaveApplications: []
     };
     await fs.writeFile(DATA_FILE, JSON.stringify(initialData, null, 2));
   }
@@ -34,7 +35,7 @@ async function readData() {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading data file:', error);
-    return { users: [], pendingUsers: [], logs: [], holidayRequests: [] };
+    return { users: [], pendingUsers: [], logs: [], holidayRequests: [], leaveApplications: [] };
   }
 }
 
@@ -167,6 +168,38 @@ app.put('/api/holiday-requests/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update holiday request' });
+  }
+});
+
+// Add leave application
+app.post('/api/leave-applications', async (req, res) => {
+  try {
+    const data = await readData();
+    const { id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp } = req.body;
+    const newApplication = { id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp };
+    data.leaveApplications.push(newApplication);
+    await writeData(data);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to add leave application' });
+  }
+});
+
+// Update leave application status
+app.put('/api/leave-applications/:id', async (req, res) => {
+  try {
+    const data = await readData();
+    const { status } = req.body;
+    const requestIndex = data.leaveApplications.findIndex(r => r.id === req.params.id);
+    if (requestIndex !== -1) {
+      data.leaveApplications[requestIndex].status = status;
+      await writeData(data);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update leave application' });
   }
 });
 

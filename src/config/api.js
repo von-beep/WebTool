@@ -87,6 +87,21 @@ export const updateHolidayRequest = async (id, status) => {
   });
 };
 
+export const addLeaveApplication = async (application) => {
+  return await apiCall('/leave-applications', {
+    method: 'POST',
+    body: JSON.stringify(application)
+  });
+};
+
+export const updateLeaveApplication = async (id, status) => {
+  console.log('Making API call to update leave application:', id, status);
+  return await apiCall(`/leave-applications/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status })
+  });
+};
+
 // Mock Firebase compatibility (for minimal changes to frontend)
 export const auth = {
   currentUser: { uid: 'anonymous', email: 'anonymous@example.com', isAnonymous: true }
@@ -172,6 +187,21 @@ export const updateDoc = async (docRef, updates) => {
         }
       } else if (updates.holidayRequests && typeof updates.holidayRequests === 'object' && !updates.holidayRequests.__type) {
         await addHolidayRequest(updates.holidayRequests);
+      }
+    } else if (updates.leaveApplications && updates.leaveApplications.__type === 'update') {
+      // Update leave application status
+      const applicationId = updates.leaveApplications.id;
+      const status = updates.leaveApplications.status;
+      console.log('Updating leave application:', applicationId, 'to status:', status);
+      await updateLeaveApplication(applicationId, status);
+    } else if (updates.leaveApplications) {
+      // Add leave application
+      if (Array.isArray(updates.leaveApplications)) {
+        for (const application of updates.leaveApplications) {
+          await addLeaveApplication(application);
+        }
+      } else if (updates.leaveApplications && typeof updates.leaveApplications === 'object' && !updates.leaveApplications.__type) {
+        await addLeaveApplication(updates.leaveApplications);
       }
     }
   } catch (error) {
