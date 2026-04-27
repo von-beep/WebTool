@@ -66,7 +66,10 @@ app.post('/api/users', async (req, res) => {
   try {
     const data = await readData();
     const { id, email, password, fullName, role } = req.body;
-    const newUser = { id, email, password, fullName, role };
+    const newUser = { id, email, password, fullName, role, status: 'active' };
+    if (!data.users) {
+      data.users = [];
+    }
     data.users.push(newUser);
     await writeData(data);
     res.json({ success: true });
@@ -76,12 +79,52 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
+// Update user status
+app.put('/api/users/:id/status', async (req, res) => {
+  try {
+    const data = await readData();
+    const { status } = req.body;
+    const userIndex = data.users.findIndex(u => u.id === req.params.id);
+    if (userIndex !== -1) {
+      data.users[userIndex].status = status;
+      await writeData(data);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update user status' });
+  }
+});
+
+// Reset user password
+app.put('/api/users/:id/password', async (req, res) => {
+  try {
+    const data = await readData();
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ error: 'Password cannot be empty' });
+    }
+    const userIndex = data.users.findIndex(u => u.id === req.params.id);
+    if (userIndex !== -1) {
+      data.users[userIndex].password = password;
+      await writeData(data);
+    }
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
 // Add pending user
 app.post('/api/pending-users', async (req, res) => {
   try {
     const data = await readData();
     const { id, email, password, fullName, role } = req.body;
     const newUser = { id, email, password, fullName, role };
+    if (!data.pendingUsers) {
+      data.pendingUsers = [];
+    }
     data.pendingUsers.push(newUser);
     await writeData(data);
     res.json({ success: true });
@@ -101,7 +144,13 @@ app.post('/api/approve-user', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     const user = data.pendingUsers[userIndex];
-    data.users.push(user);
+    if (!data.users) {
+      data.users = [];
+    }
+    if (!data.pendingUsers) {
+      data.pendingUsers = [];
+    }
+    data.users.push({ ...user, status: 'active' });
     data.pendingUsers.splice(userIndex, 1);
     await writeData(data);
     res.json({ success: true });
@@ -128,8 +177,11 @@ app.delete('/api/pending-users/:id', async (req, res) => {
 app.post('/api/logs', async (req, res) => {
   try {
     const data = await readData();
-    const { userEmail, userName, type, timestamp } = req.body;
-    const newLog = { userEmail, userName, type, timestamp };
+    const { userEmail, userName, type, timestamp, image, location } = req.body;
+    const newLog = { userEmail, userName, type, timestamp, image, location };
+    if (!data.logs) {
+      data.logs = [];
+    }
     data.logs.push(newLog);
     await writeData(data);
     res.json({ success: true });
@@ -145,6 +197,9 @@ app.post('/api/holiday-requests', async (req, res) => {
     const data = await readData();
     const { id, userEmail, userName, holidayName, holidayDate, details, status, timestamp } = req.body;
     const newRequest = { id, userEmail, userName, holidayName, holidayDate, details, status, timestamp };
+    if (!data.holidayRequests) {
+      data.holidayRequests = [];
+    }
     data.holidayRequests.push(newRequest);
     await writeData(data);
     res.json({ success: true });
@@ -177,6 +232,9 @@ app.post('/api/leave-applications', async (req, res) => {
     const data = await readData();
     const { id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp } = req.body;
     const newApplication = { id, userEmail, userName, leaveType, startDate, endDate, details, status, timestamp };
+    if (!data.leaveApplications) {
+      data.leaveApplications = [];
+    }
     data.leaveApplications.push(newApplication);
     await writeData(data);
     res.json({ success: true });
@@ -211,7 +269,10 @@ app.post('/api/auth/login', async (req, res) => {
     const user = data.users.find(u => u.email === email && u.password === password);
 
     if (user) {
-      res.json({ success: true, user });
+      if (user.status === 'disabled') {
+        return res.status(403).json({ error: 'Your account has been disabled.' });
+      }
+      res.json({ success: true, user: user });
     } else {
       const pendingUser = data.pendingUsers.find(u => u.email === email);
       if (pendingUser) {

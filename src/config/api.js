@@ -102,6 +102,27 @@ export const updateLeaveApplication = async (id, status) => {
   });
 };
 
+export const updateUserStatus = async (userId, status) => {
+  return await apiCall(`/users/${userId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+};
+
+export const resetUserPassword = async (userId, password) => {
+  return await apiCall(`/users/${userId}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  });
+};
+
+export const updateUserLeaveCredits = async (userId, credits) => {
+  return await apiCall(`/users/${userId}/leave-credits`, {
+    method: 'PUT',
+    body: JSON.stringify({ credits }),
+  });
+};
+
 // Mock Firebase compatibility (for minimal changes to frontend)
 export const auth = {
   currentUser: { uid: 'anonymous', email: 'anonymous@example.com', isAnonymous: true }
@@ -140,69 +161,42 @@ export const onSnapshot = (docRef, callback) => {
   };
 
   fetchData();
-  // Set up polling for real-time updates (every 2 seconds)
-  const interval = setInterval(fetchData, 2000);
+  // Set up polling to automatically refresh data every 5 seconds
+  const intervalId = setInterval(fetchData, 5000);
 
-  return () => clearInterval(interval);
+  // Return an unsubscribe function to clean up the interval when the component unmounts
+  return () => {
+    clearInterval(intervalId);
+  };
 };
 
 export const updateDoc = async (docRef, updates) => {
   // Handle different update operations
+  const operation = Object.keys(updates)[0];
+  const data = updates[operation];
+
   try {
-    // Check for user approval: users has union and pendingUsers has remove
-    if (updates.users && updates.users.__type === 'union' &&
-        updates.pendingUsers && updates.pendingUsers.__type === 'remove') {
-      // Approve user operation
-      const userToApprove = updates.pendingUsers.items[0];
-      if (userToApprove) {
-        await approveUser(userToApprove.id);
+    if (operation === 'users' && data.__type === 'union' && updates.pendingUsers?.__type === 'remove') {
+      // This block seems to handle user approval, but it's complex.
+      // A dedicated `approveUser` call from the component is cleaner.
+      // Assuming `approveUser` is called directly now based on frontend logic.
+      const userToApproveId = updates.pendingUsers.items[0]?.id;
+      if (userToApproveId) {
+        await approveUser(userToApproveId);
       }
-    } else if (updates.pendingUsers && updates.pendingUsers.__type === 'remove') {
-      // Deny user operation
-      const userToDeny = updates.pendingUsers.items[0];
-      if (userToDeny) {
-        await denyUser(userToDeny.id);
-      }
-    } else if (updates.logs) {
-      // Add log
-      console.log('Processing logs update:', updates.logs);
-      if (Array.isArray(updates.logs)) {
-        for (const log of updates.logs) {
-          await addLog(log);
-        }
-      } else {
-        await addLog(updates.logs);
-      }
-    } else if (updates.holidayRequests && updates.holidayRequests.__type === 'update') {
-      // Update holiday request status
-      const requestId = updates.holidayRequests.id;
-      const status = updates.holidayRequests.status;
-      console.log('Updating holiday request:', requestId, 'to status:', status);
-      await updateHolidayRequest(requestId, status);
-    } else if (updates.holidayRequests) {
-      // Add holiday request
-      if (Array.isArray(updates.holidayRequests)) {
-        for (const request of updates.holidayRequests) {
-          await addHolidayRequest(request);
-        }
-      } else if (updates.holidayRequests && typeof updates.holidayRequests === 'object' && !updates.holidayRequests.__type) {
-        await addHolidayRequest(updates.holidayRequests);
-      }
-    } else if (updates.leaveApplications && updates.leaveApplications.__type === 'update') {
-      // Update leave application status
-      const applicationId = updates.leaveApplications.id;
-      const status = updates.leaveApplications.status;
-      console.log('Updating leave application:', applicationId, 'to status:', status);
-      await updateLeaveApplication(applicationId, status);
-    } else if (updates.leaveApplications) {
-      // Add leave application
-      if (Array.isArray(updates.leaveApplications)) {
-        for (const application of updates.leaveApplications) {
-          await addLeaveApplication(application);
-        }
-      } else if (updates.leaveApplications && typeof updates.leaveApplications === 'object' && !updates.leaveApplications.__type) {
-        await addLeaveApplication(updates.leaveApplications);
-      }
+    } else if (operation === 'pendingUsers' && data.__type === 'remove') {
+      const userToDenyId = data.items[0]?.id;
+      if (userToDenyId) await denyUser(userToDenyId);
+    } else if (operation === 'logs') {
+      await addLog(data);
+    } else if (operation === 'holidayRequests' && data.__type === 'update') {
+      await updateHolidayRequest(data.id, data.status);
+    } else if (operation === 'holidayRequests' && data.__type === 'union') {
+      await addHolidayRequest(data.items[0]);
+    } else if (operation === 'leaveApplications' && data.__type === 'update') {
+      await updateLeaveApplication(data.id, data.status);
+    } else if (operation === 'leaveApplications' && data.__type === 'union') {
+      await addLeaveApplication(data.items[0]);
     }
   } catch (error) {
     console.error('Update operation failed:', error);
