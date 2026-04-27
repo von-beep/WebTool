@@ -2,8 +2,6 @@
   "name": "nexus-portal",
   "version": "1.0.0",
   "scripts": {
-    "install-all": "npm install --prefix frontend && npm install --prefix backend",
-    "build": "npm run build --prefix frontend",
-    "start": "npm start --prefix backend"
+    "start": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend && node backend/server.js"
   }
 }
